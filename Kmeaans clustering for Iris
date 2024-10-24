@@ -1,0 +1,71 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from sklearn import preprocessing
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import metrics
+
+# Téléchargement des données (à exécuter dans un environnement compatible)
+!wget https://gist.githubusercontent.com/netj/8836201/raw/6f9306ad21398ea43cba4f7d537619d0e07d5ae3/iris.csv
+
+df = pd.read_csv("iris.csv")
+print(df.head())  # les 5 premières lignes
+print(df.describe())  # résumé des données
+print(df['variety'].value_counts())  # comptage des observations par variété
+
+tmp = df.drop(index=1)
+g = sns.pairplot(tmp, hue='variety', markers='+')
+plt.show()
+
+X = df[['sepal.length', 'sepal.width', 'petal.length', 'petal.width']].values
+y = df[['variety']].values.ravel()  # aplatir en tableau 1D
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y)
+print(y)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=4)
+print('Train set:', X_train.shape, y_train.shape)
+print('Test set:', X_test.shape, y_test.shape)
+
+scaler = preprocessing.StandardScaler().fit(X_train)
+X_train_norm = scaler.transform(X_train.astype(float))
+X_test_norm = scaler.transform(X_test.astype(float))
+
+k = 4
+
+# Entraînement et prédiction
+neigh = KNeighborsClassifier(n_neighbors=k)
+neigh.fit(X_train_norm, y_train)
+
+yhat = neigh.predict(X_test_norm)
+
+print("Train set Accuracy: ", metrics.accuracy_score(y_train, neigh.predict(X_train_norm)))
+print("Test set Accuracy: ", metrics.accuracy_score(y_test, yhat))
+
+Ks = 120
+mean_acc = np.zeros((Ks-1))
+std_acc = np.zeros((Ks-1))
+
+for n in range(1, Ks):  
+    neigh = KNeighborsClassifier(n_neighbors=n).fit(X_train_norm, y_train)
+    yhat = neigh.predict(X_test_norm)
+    mean_acc[n-1] = metrics.accuracy_score(y_test, yhat)  
+    std_acc[n-1] = np.std(yhat == y_test) / np.sqrt(yhat.shape[0])  # correction de l'index
+
+best_k = np.argmax(mean_acc)
+max_accuracy = mean_acc[best_k]
+print("The best value for k is k =", best_k + 1, "with the test accuracy =", max_accuracy)
+
+plt.plot(range(1, Ks), mean_acc, 'g')
+plt.fill_between(range(1, Ks), mean_acc - 1 * std_acc, mean_acc + 1 * std_acc, alpha=0.10)
+plt.fill_between(range(1, Ks), mean_acc - 3 * std_acc, mean_acc + 3 * std_acc, alpha=0.10, color="green")
+plt.legend(('Accuracy ', '+/- 1xstd', '+/- 3xstd'))
+plt.ylabel('Accuracy ')
+plt.xlabel('Number of Neighbors (K)')
+plt.tight_layout()
+plt.show()
+
+print(X_test_norm[0:5])
